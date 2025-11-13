@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Image Tool Tabs with Spinner</title>
+<title>Image Converter with Spinner & Progress</title>
 <style>
 body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
 h1 { text-align: center; }
@@ -15,7 +15,8 @@ nav { margin-bottom: 1em; }
 nav a { margin-right: 0.5em; text-decoration: none; padding: 0.3em 0.6em; border: 1px solid #ccc; border-radius: 4px; color: #000; }
 nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
 
-.spinner-container { display: none; justify-content:center; align-items:center; margin:1em auto; }
+/* Spinner */
+.spinner-container { display: none; justify-content:center; align-items:center; flex-direction:column; margin:1em auto; }
 .MuiCircularProgress-root {
   display: inline-block;
   animation: spin 1.4s linear infinite;
@@ -39,11 +40,27 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
   100%{stroke-dasharray:100px,200px; stroke-dashoffset:-125px;}
 }
 .spinner-text { text-align: center; margin-top: 0.5em; font-weight:bold; }
+
+/* Progress bar */
+.progress-bar-container {
+  width: 100%;
+  height: 20px;
+  background-color: #eee;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 1em;
+}
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background-color: #1976d2;
+  transition: width 0.2s;
+}
 </style>
 </head>
 <body>
 
-<h1>Image Tool Tabs with Spinner</h1>
+<h1>Image Converter with Spinner & Progress</h1>
 
 <nav>
 <a href="?tab=Converter" id="linkConverter">Converter</a>
@@ -61,7 +78,7 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
     <option value="md5">MD5 Hash</option>
     <option value="sha256">SHA-256 Hash</option>
   </select>
-  <button onclick="startEncoding()">Encode</button>
+  <button onclick="startUpload()">Start Upload</button>
 
   <div class="spinner-container" id="spinner">
     <span class="MuiCircularProgress-root" role="progressbar">
@@ -69,7 +86,10 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
         <circle class="MuiCircularProgress-circle" cx="44" cy="44" r="20.2"></circle>
       </svg>
     </span>
-    <div class="spinner-text" id="spinnerText"></div>
+    <div class="spinner-text" id="spinnerText">Uploading...</div>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
   </div>
 
   <textarea id="output" placeholder="Encoded output will appear here..." readonly></textarea>
@@ -95,7 +115,7 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
 <script>
 let uploadedFile = null;
 
-// Tab management
+// Tabs
 function showTab(tabName) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   const tab = document.getElementById(tabName);
@@ -110,13 +130,13 @@ const params = new URLSearchParams(window.location.search);
 const tabParam = params.get('tab') || 'Converter';
 showTab(tabParam);
 
-// File selection
+// File input
 document.getElementById('fileInput').addEventListener('change', e => {
   uploadedFile = e.target.files[0];
   updateStats();
 });
 
-// Utilities for encoding
+// Encoding utils
 function arrayBufferToBase64(buffer) {
   const chunkSize = 0x8000;
   let binary = '';
@@ -133,7 +153,7 @@ function arrayBufferToHex(buffer) {
   return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// Show spinner with text
+// Show/hide spinner
 function showSpinner(text) {
   const spinner = document.getElementById('spinner');
   const spinnerText = document.getElementById('spinnerText');
@@ -145,18 +165,39 @@ function hideSpinner() {
   document.getElementById('spinner').style.display = 'none';
 }
 
-// Main encoding with spinner simulation
-async function startEncoding() {
+// Simulate upload with progress bar
+async function startUpload() {
   if (!uploadedFile) {
     alert("Please upload an image first!");
     return;
   }
+  const progressBar = document.getElementById('progressBar');
   showSpinner('Uploading...');
-  await new Promise(r => setTimeout(r, 3000)); // simulate upload
+  progressBar.style.width = '0%';
 
+  const fileSizeKB = uploadedFile.size / 1024;
+  let uploadedKB = 0;
+  const speedKBs = 10; // 10 KB/s
+
+  await new Promise(resolve => {
+    const interval = setInterval(() => {
+      uploadedKB += speedKBs;
+      if (uploadedKB >= fileSizeKB) uploadedKB = fileSizeKB;
+      const percent = (uploadedKB / fileSizeKB) * 100;
+      progressBar.style.width = percent + '%';
+      if (uploadedKB >= fileSizeKB) {
+        clearInterval(interval);
+        resolve();
+      }
+    }, 1000);
+  });
+
+  // Simulate converting 3s
   showSpinner('Converting...');
-  await new Promise(r => setTimeout(r, 3000)); // simulate conversion
+  progressBar.style.width = '100%';
+  await new Promise(r => setTimeout(r, 3000));
 
+  // Encode file
   const encoding = document.getElementById('encoding').value;
   const arrayBuffer = await uploadedFile.arrayBuffer();
   let result = '';
