@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Image Tool Tabs</title>
+<title>Image Tool Tabs with Spinner</title>
 <style>
 body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
 h1 { text-align: center; }
@@ -14,16 +14,41 @@ textarea { width: 100%; height: 150px; margin-top: 0.5em; }
 nav { margin-bottom: 1em; }
 nav a { margin-right: 0.5em; text-decoration: none; padding: 0.3em 0.6em; border: 1px solid #ccc; border-radius: 4px; color: #000; }
 nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
+
+.spinner-container { display: none; justify-content:center; align-items:center; margin:1em auto; }
+.MuiCircularProgress-root {
+  display: inline-block;
+  animation: spin 1.4s linear infinite;
+  color: #1976d2;
+  width: 4rem;
+  height: 4rem;
+}
+@keyframes spin { 0%{transform:rotate(0deg);} 100%{transform:rotate(360deg);} }
+.MuiCircularProgress-svg { display: block; }
+.MuiCircularProgress-circle {
+  stroke: currentColor;
+  stroke-dasharray: 80px, 200px;
+  stroke-dashoffset: 0;
+  animation: dash 1.4s ease-in-out infinite;
+  fill: none;
+  stroke-width: 3.4;
+}
+@keyframes dash {
+  0%{stroke-dasharray:1px,200px; stroke-dashoffset:0;}
+  50%{stroke-dasharray:100px,200px; stroke-dashoffset:-15px;}
+  100%{stroke-dasharray:100px,200px; stroke-dashoffset:-125px;}
+}
+.spinner-text { text-align: center; margin-top: 0.5em; font-weight:bold; }
 </style>
 </head>
 <body>
 
-<h1>Image Tool Tabs</h1>
+<h1>Image Tool Tabs with Spinner</h1>
 
 <nav>
 <a href="?tab=Converter" id="linkConverter">Converter</a>
-<a href="?tab=Monitor-howmuchdata" id="linkData">Monitor-howmuchdata</a>
-<a href="?tab=Monitor-resource" id="linkResource">Monitor-resource</a>
+<a href="?tab=Monitor-howmuchdata" id="linkMonitorhowmuchdata">Monitor-howmuchdata</a>
+<a href="?tab=Monitor-resource" id="linkMonitorresource">Monitor-resource</a>
 </nav>
 
 <div id="Converter" class="tab">
@@ -36,7 +61,17 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
     <option value="md5">MD5 Hash</option>
     <option value="sha256">SHA-256 Hash</option>
   </select>
-  <button onclick="encodeFile()">Encode</button>
+  <button onclick="startEncoding()">Encode</button>
+
+  <div class="spinner-container" id="spinner">
+    <span class="MuiCircularProgress-root" role="progressbar">
+      <svg class="MuiCircularProgress-svg" viewBox="22 22 44 44">
+        <circle class="MuiCircularProgress-circle" cx="44" cy="44" r="20.2"></circle>
+      </svg>
+    </span>
+    <div class="spinner-text" id="spinnerText"></div>
+  </div>
+
   <textarea id="output" placeholder="Encoded output will appear here..." readonly></textarea>
 </div>
 
@@ -60,52 +95,85 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
 <script>
 let uploadedFile = null;
 
-// Show tab based on ?tab= query parameter
+// Tab management
 function showTab(tabName) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   const tab = document.getElementById(tabName);
   if (tab) tab.classList.add('active');
 
-  // Update nav link active state
   document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
   const link = document.getElementById('link' + tabName.replace(/-/g,''));
   if (link) link.classList.add('active');
 }
 
-// Read query param
 const params = new URLSearchParams(window.location.search);
 const tabParam = params.get('tab') || 'Converter';
 showTab(tabParam);
 
+// File selection
 document.getElementById('fileInput').addEventListener('change', e => {
   uploadedFile = e.target.files[0];
   updateStats();
 });
 
-async function encodeFile() {
+// Utilities for encoding
+function arrayBufferToBase64(buffer) {
+  const chunkSize = 0x8000;
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
+}
+
+function arrayBufferToHex(buffer) {
+  const bytes = new Uint8Array(buffer);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+// Show spinner with text
+function showSpinner(text) {
+  const spinner = document.getElementById('spinner');
+  const spinnerText = document.getElementById('spinnerText');
+  spinnerText.innerText = text;
+  spinner.style.display = 'flex';
+}
+
+function hideSpinner() {
+  document.getElementById('spinner').style.display = 'none';
+}
+
+// Main encoding with spinner simulation
+async function startEncoding() {
   if (!uploadedFile) {
     alert("Please upload an image first!");
     return;
   }
+  showSpinner('Uploading...');
+  await new Promise(r => setTimeout(r, 3000)); // simulate upload
+
+  showSpinner('Converting...');
+  await new Promise(r => setTimeout(r, 3000)); // simulate conversion
+
   const encoding = document.getElementById('encoding').value;
   const arrayBuffer = await uploadedFile.arrayBuffer();
-
   let result = '';
-  if (encoding === 'base64') {
-    const bytes = new Uint8Array(arrayBuffer);
-    result = btoa(String.fromCharCode(...bytes));
-  } else if (encoding === 'hex') {
-    const bytes = new Uint8Array(arrayBuffer);
-    result = Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
-  } else if (encoding === 'md5' || encoding === 'sha256') {
+  if (encoding === 'base64') result = arrayBufferToBase64(arrayBuffer);
+  else if (encoding === 'hex') result = arrayBufferToHex(arrayBuffer);
+  else if (encoding === 'md5' || encoding === 'sha256') {
     const algo = encoding.toUpperCase();
     const hashBuffer = await crypto.subtle.digest(algo, arrayBuffer);
-    result = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2,'0')).join('');
+    result = arrayBufferToHex(hashBuffer);
   }
+
   document.getElementById('output').value = result;
+  hideSpinner();
   updateStats();
 }
 
+// Stats update
 function updateStats() {
   if (!uploadedFile) return;
   const sizeMB = uploadedFile.size / (1024*1024);
@@ -113,15 +181,17 @@ function updateStats() {
   let factor = 1;
   if (encoding === 'base64') factor = 1.33;
   else if (encoding === 'hex') factor = 2;
-  else factor = 0.05; // hash negligible
+  else factor = 0.05;
   const estimatedRAM = sizeMB * factor;
-  const estimatedCPU = sizeMB * factor * 5; // arbitrary units
+  const estimatedCPU = sizeMB * factor * 5;
+
   document.getElementById('statsOutput').innerHTML = `
     File size: ${sizeMB.toFixed(2)} MB<br>
     Encoding: ${encoding}<br>
     Estimated RAM usage: ~${estimatedRAM.toFixed(2)} MB<br>
     Estimated CPU work: ~${estimatedCPU.toFixed(0)} units
   `;
+
   document.getElementById('resourceOutput').innerHTML = `
     Uploaded file: ${uploadedFile.name} <br>
     File size: ${sizeMB.toFixed(2)} MB <br>
@@ -129,6 +199,5 @@ function updateStats() {
   `;
 }
 </script>
-
 </body>
 </html>
