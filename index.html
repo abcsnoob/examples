@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Image Converter with Spinner & Progress</title>
+<title>Dynamic Bandwidth Converter</title>
 <style>
 body { font-family: sans-serif; max-width: 800px; margin: 2em auto; }
 h1 { text-align: center; }
@@ -60,7 +60,7 @@ nav a.active { background-color: #007bff; color: #fff; border-color: #007bff; }
 </head>
 <body>
 
-<h1>Image Converter with Spinner & Progress</h1>
+<h1>Dynamic Bandwidth Converter</h1>
 
 <nav>
 <a href="?tab=Converter" id="linkConverter">Converter</a>
@@ -120,12 +120,10 @@ function showTab(tabName) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   const tab = document.getElementById(tabName);
   if (tab) tab.classList.add('active');
-
   document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
   const link = document.getElementById('link' + tabName.replace(/-/g,''));
   if (link) link.classList.add('active');
 }
-
 const params = new URLSearchParams(window.location.search);
 const tabParam = params.get('tab') || 'Converter';
 showTab(tabParam);
@@ -147,52 +145,55 @@ function arrayBufferToBase64(buffer) {
   }
   return btoa(binary);
 }
-
 function arrayBufferToHex(buffer) {
   const bytes = new Uint8Array(buffer);
   return Array.from(bytes).map(b => b.toString(16).padStart(2,'0')).join('');
 }
 
-// Show/hide spinner
+// Spinner show/hide
 function showSpinner(text) {
   const spinner = document.getElementById('spinner');
   const spinnerText = document.getElementById('spinnerText');
   spinnerText.innerText = text;
   spinner.style.display = 'flex';
 }
-
 function hideSpinner() {
   document.getElementById('spinner').style.display = 'none';
 }
 
-// Simulate upload with progress bar
+// Determine upload speed based on file size
+function getUploadSpeed(sizeBytes) {
+  if (sizeBytes > 100*1024*1024) return {speed: 10*1024, msg: "Adding more bandwidth..."}; // 10 MB/s
+  if (sizeBytes > 10*1024*1024) return {speed: 1024, msg: "Adding more bandwidth..."}; // 1 MB/s
+  if (sizeBytes > 1024*1024) return {speed: 100, msg: "Adding more bandwidth..."}; // 100 KB/s
+  return {speed: 10, msg: ""}; // 10 KB/s
+}
+
+// Upload with dynamic bandwidth
 async function startUpload() {
-  if (!uploadedFile) {
-    alert("Please upload an image first!");
-    return;
-  }
+  if (!uploadedFile) { alert("Please upload an image first!"); return; }
   const progressBar = document.getElementById('progressBar');
-  showSpinner('Uploading...');
   progressBar.style.width = '0%';
 
+  let {speed, msg} = getUploadSpeed(uploadedFile.size);
+  // If msg exists, show it 2s before upload
+  if (msg) { showSpinner(msg); await new Promise(r=>setTimeout(r,2000)); }
+
+  showSpinner('Uploading...');
   const fileSizeKB = uploadedFile.size / 1024;
   let uploadedKB = 0;
-  const speedKBs = 10; // 10 KB/s
 
   await new Promise(resolve => {
     const interval = setInterval(() => {
-      uploadedKB += speedKBs;
+      uploadedKB += speed;
       if (uploadedKB >= fileSizeKB) uploadedKB = fileSizeKB;
       const percent = (uploadedKB / fileSizeKB) * 100;
       progressBar.style.width = percent + '%';
-      if (uploadedKB >= fileSizeKB) {
-        clearInterval(interval);
-        resolve();
-      }
+      if (uploadedKB >= fileSizeKB) { clearInterval(interval); resolve(); }
     }, 1000);
   });
 
-  // Simulate converting 3s
+  // Converting
   showSpinner('Converting...');
   progressBar.style.width = '100%';
   await new Promise(r => setTimeout(r, 3000));
